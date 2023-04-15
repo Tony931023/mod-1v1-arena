@@ -33,6 +33,13 @@ Arena1v1.MinLevel = 80
 Arena1v1.Costs = 400000
 
 #
+#    Arena1v1.Costs.del
+#        Description: Costs for delete an arena team (Fix Crash)
+#        Default:     10000000 - (1k gold)
+
+Arena1v1.Costsdel = 10000000
+
+#
 #    Arena1v1.VendorRating
 #        Description: If true, 1v1 rating will use to calculate highest personal-rating (extended costs).
 #                      Note: The vendor-item will show as not buyable (red), but players can buy it, if enabled and rating is high enough.

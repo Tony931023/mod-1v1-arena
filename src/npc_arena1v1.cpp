@@ -70,6 +70,7 @@ public:
             ChatHandler(pPlayer->GetSession()).SendSysMessage("This server is running the |cff4CFF00Arena 1v1 |rmodule.");
     }
 
+    
 
     void GetCustomGetArenaTeamId(const Player* player, uint8 slot, uint32& id) const override
     {
@@ -119,33 +120,58 @@ public:
 
         if (sConfigMgr->GetOption<bool>("Arena1v1.Enable", true) == false)
         {
-            ChatHandler(player->GetSession()).SendSysMessage("1v1 disabled!");
+            ChatHandler(player->GetSession()).SendSysMessage("Las arenas 1v1 está desabilitada");
             return true;
         }
 
         if (player->InBattlegroundQueueForBattlegroundQueueType(bgQueueTypeId))
         {
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Queue leave 1v1 Arena", GOSSIP_SENDER_MAIN, 3, "Are you sure?", 0, false);
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Salir de la cola de la arena 1v1", GOSSIP_SENDER_MAIN, 3, "¿Estás seguro?", 0, false);
         }
         else
         {
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Queue enter 1v1 Arena (UnRated)", GOSSIP_SENDER_MAIN, 20);
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Entrar en la cola de la Arena 1v1 (sin calificación)", GOSSIP_SENDER_MAIN, 20);
         }
 
         if (!player->GetArenaTeamId(ArenaTeam::GetSlotByType(ARENA_TEAM_1V1)))
         {
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Create new 1v1 Arena Team", GOSSIP_SENDER_MAIN, 1, "Are you sure?", sConfigMgr->GetOption<uint32>("Arena1v1.Costs", 400000), false);
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Crear un nuevo equipo para la Arena 1v1", GOSSIP_SENDER_MAIN, 1, "¿Estás seguro, tu honor y arena se reiniciara a 0?", sConfigMgr->GetOption<uint32>("Arena1v1.Costs", 400000), false);
         }
         else
         {
-            if (!player->InBattlegroundQueueForBattlegroundQueueType(bgQueueTypeId))
+            std::string pname = player->GetName();
+
+            QueryResult Result = CharacterDatabase.Query("SELECT `type` FROM `arena_team` WHERE `name` = '{}'", pname);
+			if (Result)
             {
-                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Queue enter 1v1 Arena (Rated)", GOSSIP_SENDER_MAIN, 2);
-                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Arenateam Clear", GOSSIP_SENDER_MAIN, 5, "Are you sure?", 0, false);
+                do
+                {
+                    Field* fields = Result->Fetch();
+                    uint32 type = fields[0].Get<int32>();
+                    
+                    if (type)
+                    {
+                        if (!player->InBattlegroundQueueForBattlegroundQueueType(bgQueueTypeId))
+                        {
+                            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Entrar en la cola de la Arena 1v1 (con calificación)", GOSSIP_SENDER_MAIN, 2);
+                            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Borrar el equipo de la Arena", GOSSIP_SENDER_MAIN, 5, "¿Estás seguro, tu honor y arena se reiniciara a 0?", sConfigMgr->GetOption<uint64>("Arena1v1.Costsdel", 10000000), false);
+                        }
+                        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mostrar tus estadísticas", GOSSIP_SENDER_MAIN, 4);
+
+                    }
+                    
+
+                    
+                } while (Result->NextRow());
+
+                
             }
 
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Shows your statistics", GOSSIP_SENDER_MAIN, 4);
-        }
+            if (!Result) {
+                AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Crear un nuevo equipo para la Arena 1v1", GOSSIP_SENDER_MAIN, 1, "¿Estás seguro, tu honor y arenas se reiniciaran a 0?", sConfigMgr->GetOption<uint32>("Arena1v1.Costs", 400000), false);
+            }
+            
+		}
 
         SendGossipMenuFor(player, 68, creature);
         return true;
@@ -171,7 +197,7 @@ public:
             }
             else
             {
-                handler.PSendSysMessage("You have to be level %u + to create a 1v1 arena team.", sConfigMgr->GetOption<uint32>("Arena1v1.MinLevel", 70));
+                handler.PSendSysMessage("Debes ser de nivel %u o superior para crear un equipo de arena 1v1", sConfigMgr->GetOption<uint32>("Arena1v1.MinLevel", 70));
                 CloseGossipMenuFor(player);
                 return true;
             }
@@ -181,7 +207,7 @@ public:
         case 2: // Join Queue Arena (rated)
         {
             if (Arena1v1CheckTalents(player) && !JoinQueueArena(player, creature, true))
-                handler.SendSysMessage("Something went wrong when joining the queue.");
+                handler.SendSysMessage("Algo salió mal al unirse a la cola");
 
             CloseGossipMenuFor(player);
             return true;
@@ -191,7 +217,7 @@ public:
         case 20: // Join Queue Arena (unrated)
         {
             if (Arena1v1CheckTalents(player) && !JoinQueueArena(player, creature, false))
-                handler.SendSysMessage("Something went wrong when joining the queue.");
+                handler.SendSysMessage("Algo salió mal al unirse a la cola");
 
             CloseGossipMenuFor(player);
             return true;
@@ -219,12 +245,12 @@ public:
             if (at)
             {
                 std::stringstream s;
-                s << "Rating: " << at->GetStats().Rating;
-                s << "\nRank: " << at->GetStats().Rank;
-                s << "\nSeason Games: " << at->GetStats().SeasonGames;
-                s << "\nSeason Wins: " << at->GetStats().SeasonWins;
-                s << "\nWeek Games: " << at->GetStats().WeekGames;
-                s << "\nWeek Wins: " << at->GetStats().WeekWins;
+                s << "Calificación: " << at->GetStats().Rating;
+                s << "\nRango: " << at->GetStats().Rank;
+                s << "\nPartidas: " << at->GetStats().SeasonGames;
+                s << "\nVictorias: " << at->GetStats().SeasonWins;
+                s << "\nPartidas de la semana: " << at->GetStats().WeekGames;
+                s << "\nVictorias de la semana: " << at->GetStats().WeekWins;
 
                 ChatHandler(player->GetSession()).PSendSysMessage(SERVER_MSG_STRING, s.str().c_str());
             }
@@ -233,11 +259,16 @@ public:
 
         case 5: // Disband arenateam
         {
-            WorldPacket Data;
-            Data << player->GetArenaTeamId(ArenaTeam::GetSlotByType(ARENA_TEAM_1V1));
-            player->GetSession()->HandleArenaTeamLeaveOpcode(Data);
-            handler.SendSysMessage("Arenateam deleted!");
-            CloseGossipMenuFor(player);
+            if (player->GetMoney() >= uint32(sConfigMgr->GetOption<uint64>("Arena1v1.Costsdel", 10000000)))
+            {
+                player->ModifyMoney(sConfigMgr->GetOption<uint64>("Arena1v1.Costsdel", 10000000) * -1);
+                WorldPacket Data;
+                Data << player->GetArenaTeamId(ArenaTeam::GetSlotByType(ARENA_TEAM_1V1));
+                player->GetSession()->HandleArenaTeamLeaveOpcode(Data);
+                handler.SendSysMessage("Team de Arena Borrado!");
+                CloseGossipMenuFor(player);
+                
+            }
             return true;
         }
         break;
@@ -337,6 +368,10 @@ private:
         if (!player || !me)
             return false;
 
+        
+        player->ModifyArenaPoints(-10000);
+        player->ModifyHonorPoints(-75000);
+
         uint8 slot = ArenaTeam::GetSlotByType(ARENA_TEAM_1V1);
         //Just to make sure as some other module might edit this value
         if (slot == 0)
@@ -345,7 +380,7 @@ private:
         // Check if player is already in an arena team
         if (player->GetArenaTeamId(slot))
         {
-            player->GetSession()->SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, player->GetName(), "You are already in an arena team!", ERR_ALREADY_IN_ARENA_TEAM);
+            player->GetSession()->SendArenaTeamCommandResult(ERR_ARENA_TEAM_CREATE_S, player->GetName(), "¡Ya estás en un equipo de arena!", ERR_ALREADY_IN_ARENA_TEAM);
             return false;
         }
 
@@ -376,7 +411,66 @@ private:
         // Register arena team
         sArenaTeamMgr->AddArenaTeam(arenaTeam);
 
-        ChatHandler(player->GetSession()).SendSysMessage("1v1 Arenateam successfully created!");
+        ChatHandler(player->GetSession()).SendSysMessage("¡Equipo de arena 1v1 creado exitosamente!");
+
+        std::string frase[43] = {
+            
+            "te desafía a que pruebes que eres capaz de vencerlo.",
+            "no cree que puedes su mi nivel!",
+            "dice que si quieres enfrentarte a alguien de verdad, que lo desafies",
+            "te reta a que intentes superar su habilidad.",
+            "no teme a ningún reto, ¿te atreves a enfrentarte a él?",
+            "no se deja vencer fácilmente, ¿tienes lo que se necesita para superarlo?",
+            "está listo para cualquier desafío, ¿y tú?",
+            "ha enfrentado a los enemigos más temibles de Azeroth, ¿te atreves a desafiarlo?",
+            "ha luchado en las batallas más épicas de la historia de WoW, ¿crees que eres lo suficientemente fuerte para enfrentarlo?",
+            "ha explorado los rincones más peligrosos de Azeroth, ¿estás listo para seguir sus pasos?",
+            "puede hacerte morder el polvo más rápido que un elfo corriendo de un enano borracho.",
+            "tal vez debería retarme en arena, claro si crees que tienes lo que se necesita. Si no, mejor ve a hacer una misión de recolección de hierbas.",
+            "puede hacerte sudar más que un ogro en un sauna.",
+            "dice que lo retes, que te enseñara la habiliadad del MORDEDOR DE ALMOHADA",
+            "dice que es rey de Azeroth, y tú eres solo una hormiga en su camino.",
+            "te está esperando, pero tal vez deberías practicar primero tu Huida veloz o te verás muy ridículo tratando de escapar.",
+            "te reta a las arenas, pero no se hace responsable de tus huesos rotos o de tu ego lastimado.",
+            "no solo es fuerte, también es listo. ¿Crees que puedes vencerlo en inteligencia? Tal vez deberías practicar primero con un gnomo.",
+            "es tan fuerte que puede levantar más peso que un Tauren. ¿Crees que puedes derrotarlo en un duelo? Tal vez deberías intentarlo en otra vida.",
+            "no es solo un nombre, es un estado de ánimo. ¿Estás listo para enfrentarte a su mentalidad épica?",
+            "te reta a un duelo, pero tal vez deberías entrenar primero para no morir como un personaje de nivel 1.",
+            "está listo para luchar, ¿estás listo para hacer frente a su furia de gladiador?",
+            "es tan feroz como un dragón enojado. ¿Estás listo para desafiar su ira?",
+            "es el rey de la arena. Si quieres vencerlo, necesitarás algo más que suerte.",
+            "dice que si quieres una verdadera batalla, desafialo. Pero no te sorprendas si terminas con más heridas que un personaje de bajo nivel en una mazmorra.",
+            "es más peligroso que Kil'jaeden en su forma más poderosa. ¿Estás seguro de que quieres desafiarlo?",
+            "dice que si quieres busques a tu amigo paladin, si el de las sentencias de 25k",
+            "es más astuto que Illidan y más mortal que Arthas. ¿Estás preparado para enfrentarte a su oscuridad?",
+            "es como una lucha contra Al'Akir: un verdadero desafío. ¿Crees que puedes superarlo?",
+            "es más rápido que la velocidad de ataque de Lady Vashj. ¿Crees que puedes superarlo?",
+            "es más hábil que la mayoría de los jefes de las mazmorras. ¿Estás listo para enfrentarlo como si fuera Kel'Thuzad?",
+            "es más poderoso que un ejército de No-Muertos liderados por el Rey Exánime. ¿Estás seguro de que quieres desafiarlo?",
+            "dice que necesitarás más suerte que la que tiene un cazador con su equipo de agilidad.",
+            "es tan despiadado como un grupo de bandidos gnolls. ¿Estás listo para enfrentarte a su ferocidad?",
+            "es más duro que la pelea contra Alamuerte en su forma de dragón. ¿Crees que tienes lo que se necesita para vencerlo?",
+            "es más implacable que un ataque de murlocs en la costa. ¿Estás listo para enfrentarlo como si fuera un jefe de raid?",
+            "dice que si quieres derrotarlo, tendrás que tener tanta suerte como la que tiene un ladrón con un golpe crítico.",
+            "es más hábil que un pícaro con su arsenal de habilidades. ¿Crees que puedes vencerlo?",
+            "es más rápido que un corcel de guerra de la Alianza. ¿Crees que puedes mantener el ritmo?",
+            "es tan letal como un grupo de dragones escupefuego. ¿Estás listo para enfrentarte a su furia?",
+            "es más peligroso que un cazador con su mascota más letal. ¿Estás preparado para enfrentarlo?",
+            "es tan implacable como un grupo de esqueletos en un cementerio. ¿Estás listo para enfrentarlo?",
+            "es más poderoso que un grupo de demonios liderados por Archimonde. ¿Estás seguro de que quieres desafiarlo?"
+   
+        };
+        std::srand(std::time(nullptr));
+        int index = std::rand() % 43;
+        
+
+        std::string rewardMsg = "";
+        std::string victimMsg = "";
+        std::string rewardVal = "";
+
+        rewardMsg.append("|cff676767[|cffFFFF00PVP 1v1|cff676767]|r:|cff4CFF00 ").append(player->GetName()).append(" |cffFF0000");
+        rewardMsg.append(frase[index]);
+        sWorld->SendServerMessage(SERVER_MSG_STRING, rewardMsg.c_str());
 
         return true;
     }
@@ -400,7 +494,7 @@ private:
 
             if (std::find(forbiddenTalents.begin(), forbiddenTalents.end(), talentInfo->TalentID) != forbiddenTalents.end())
             {
-                ChatHandler(player->GetSession()).SendSysMessage("You can not join because you have forbidden talents.");
+                ChatHandler(player->GetSession()).SendSysMessage("No puedes unirte porque tienes talentos prohibidos");
                 return false;
             }
 
@@ -411,7 +505,7 @@ private:
 
         if (count >= 36)
         {
-            ChatHandler(player->GetSession()).SendSysMessage("You can not join because you have too many talent points in a forbidden tree. (Heal / Tank)");
+            ChatHandler(player->GetSession()).SendSysMessage("No puedes unirte porque tienes demasiados puntos de talento en un árbol prohibido (Sanación/Tanque)");
             return false;
         }
 
