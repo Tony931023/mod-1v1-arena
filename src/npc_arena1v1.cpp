@@ -154,9 +154,12 @@ public:
                         if (!player->InBattlegroundQueueForBattlegroundQueueType(bgQueueTypeId))
                         {
                             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Entrar en la cola de la Arena 1v1 (con calificación)", GOSSIP_SENDER_MAIN, 2);
-                            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Borrar el equipo de la Arena", GOSSIP_SENDER_MAIN, 5, "¿Estás seguro, tu honor y arena se reiniciara a 0?", sConfigMgr->GetOption<uint64>("Arena1v1.Costsdel", 10000000), false);
+                            //AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Borrar el equipo de la Arena", GOSSIP_SENDER_MAIN, 5, "¿Estás seguro, tu honor y arena se reiniciara a 0?", sConfigMgr->GetOption<uint64>("Arena1v1.Costsdel", 10000000), false);
                         }
+                        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Guardar Honor", GOSSIP_SENDER_MAIN, 8);
+                        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Restaurar Honor", GOSSIP_SENDER_MAIN, 10);
                         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Mostrar tus estadísticas", GOSSIP_SENDER_MAIN, 4);
+                        
 
                     }
                     
@@ -254,6 +257,78 @@ public:
 
                 ChatHandler(player->GetSession()).PSendSysMessage(SERVER_MSG_STRING, s.str().c_str());
             }
+        }
+        break;
+
+        case 8: // Guardar Honor
+        {
+            uint32 php = player->GetHonorPoints();
+            auto paic = player->GetGUID().GetCounter();
+            if (QueryResult t_query = CharacterDatabase.Query("SELECT `pguid`, `honor` FROM `arena_honor_save` WHERE `pguid` = '{}'", paic))
+            {
+                do {
+                    Field* t_fields = t_query->Fetch();                    
+                    uint32 pguidbd = t_fields[0].Get<int32>();
+                    uint32  honorbd = t_fields[1].Get<int32>();
+
+                    uint32 HP = php - 1;
+                    uint32  honorbdU = honorbd + HP;                    
+                    if (honorbdU >= 75000) {
+                        honorbdU = 75000;
+                    }
+                    CharacterDatabase.Execute("UPDATE arena_honor_save SET honor = {} WHERE pguid = {};", honorbdU, paic);
+                    player->ModifyHonorPoints(-HP);
+                    ChatHandler(player->GetSession()).PSendSysMessage("Se Guardo %u Puntos de Honor, recurda el maximo permitido es 75k!", HP);
+                    ChatHandler(player->GetSession()).PSendSysMessage("Tienes Guardado %u Puntos de Honor!", honorbdU);
+
+                } while (t_query->NextRow());
+
+            }
+            else {
+                                
+                uint32 HP = php - 1;
+                player->ModifyHonorPoints(-HP);
+                CharacterDatabase.Execute("INSERT INTO arena_honor_save (pguid, honor) VALUES ({}, {})", paic, HP);
+                ChatHandler(player->GetSession()).PSendSysMessage("Se Guardo %u Puntos de Honor, recurda el maximo permitido es 75k!", HP);                
+            }
+            CloseGossipMenuFor(player);
+            return true;
+        }
+        break;
+        
+        case 10: // rest
+        {
+            uint32 php = player->GetHonorPoints();
+            auto paic = player->GetGUID().GetCounter();
+            if (QueryResult t_query = CharacterDatabase.Query("SELECT `pguid`, `honor` FROM `arena_honor_save` WHERE `pguid` = '{}'", paic))
+            {
+                do {
+                    Field* t_fields = t_query->Fetch();                    
+                    uint32 pguidbd = t_fields[0].Get<int32>();
+                    uint32  honorbd = t_fields[1].Get<int32>();
+
+                    if (honorbd == 0) {
+                        ChatHandler(player->GetSession()).PSendSysMessage("No tienes Puntos de Honor Guardado!");
+                    }
+                    else {
+                        uint32 PHR = php + honorbd - 1;
+                        uint32 PHRC = 0;
+
+                        if (PHR >= 75000) {
+                            PHR = 74999;
+                        }
+                        ChatHandler(player->GetSession()).PSendSysMessage("Se Restauro %u Puntos de Honor!", PHR);
+                        CharacterDatabase.Execute("UPDATE arena_honor_save SET honor = {} WHERE pguid = {};", PHRC, paic);
+                        player->ModifyHonorPoints(PHR);
+                    }
+                } while (t_query->NextRow());
+
+            }
+            else {
+                ChatHandler(player->GetSession()).PSendSysMessage("No tienes ningun punto guardado a restaurar!");                
+            }
+            CloseGossipMenuFor(player);
+            return true;
         }
         break;
 
